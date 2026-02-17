@@ -11,9 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 @Service
 @Slf4j
@@ -53,10 +51,6 @@ public class ConversationService {
         String username = user.getUsername();
 
         List<User> users = userService.getAllUsers();
-        User thisUser = users.stream()
-                .filter(u -> u.getUsername().equals(username))
-                .findFirst()
-                .orElseThrow(EntityNotFoundException::new);
 
         return users.stream()
                 .filter(u -> !u.getUsername().equals(username))
@@ -65,7 +59,7 @@ public class ConversationService {
                                 UserConnection.builder()
                                         .id(u.getId())
                                         .connectionUsername(u.getUsername())
-                                        .convID(getConvID(u, thisUser))
+                                        .convID(getConvID(u, user))
                                         .unSeen(0)
                                         .isOnline(statusService.isUserOnline(u.getId()))
                                         .build()
@@ -81,6 +75,35 @@ public class ConversationService {
         if(!(CollectionUtils.isEmpty(unseenMessages))) {
             log.info("there are some unseen messages for {} from {}", user.getUsername(), fromUserID);
             updateMessageDelivery(fromUserID, unseenMessages, EMessageDeliveryStatus.SEEN);
+        }
+
+        return result;
+    }
+
+    public List<UnseenMessageCountResponse> getUnseenMessagesCount() {
+        List<UnseenMessageCountResponse> result = new ArrayList<>();
+        User user = securityUtils.getUser();
+        List<Conversation> unseenMessages = this.findUnseenMessagesCount(user.getId());
+
+        if(!CollectionUtils.isEmpty(unseenMessages)) {
+            Map<Long, List<Conversation>> unseenMessagesCountByUser = new HashMap<>();
+
+            for(Conversation c : unseenMessages) {
+                List<Conversation> values = unseenMessagesCountByUser.getOrDefault(c.getFromUser(), new ArrayList<>());
+                values.add(c);
+                unseenMessagesCountByUser.put(c.getFromUser(), values);
+            }
+            log.info("there are some unseen messages for {}", user.getUsername());
+            unseenMessagesCountByUser.forEach(
+                    (u, conversations) -> {
+                        result.add(
+                                UnseenMessageCountResponse.builder()
+                                        .count((long) conversations.size())
+                                        .fromUser(u)
+                                        .build()
+                        );
+                        updateMessageDelivery(u, conversations, EMessageDeliveryStatus.DELIVERED);
+                    });
         }
 
         return result;

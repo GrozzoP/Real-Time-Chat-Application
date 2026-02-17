@@ -12,7 +12,11 @@ import java.util.Optional;
 @Repository
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
     @Query(
-            "SELECT * FROM Conversation c WHERE c.toUser = :toUser AND c.deliveryStatus IN ('NOT_DELIVERED', 'DELIVERED')"
+            "SELECT c FROM Conversation c " +
+                    "WHERE c.toUser = :toUser " +
+                    "AND c.fromUser = :fromUser " +
+                    "AND c.deliveryStatus IN ('NOT_DELIVERED', 'DELIVERED') " +
+                    "ORDER BY c.time ASC"
     )
     Optional<List<Conversation>> findUnseenMessages(
             @Param("toUser") Long toUser,
@@ -21,7 +25,7 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 
     @Query(
             value =
-                    "SELECT * FROM Conversation WHERE to_user = :toUser and delivery_status IN ('NOT_DELIVERED', 'DELIVERED')"
+                    "SELECT c FROM Conversation c WHERE c.toUser = :toUser AND c.deliveryStatus IN ('NOT_DELIVERED', 'DELIVERED')"
     )
     Optional<List<Conversation>> findUnseenMessagesCount(@Param("toUser") Long toUser);
 }
