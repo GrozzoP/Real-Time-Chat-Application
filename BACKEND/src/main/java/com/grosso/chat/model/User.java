@@ -1,7 +1,10 @@
 package com.grosso.chat.model;
 
+import com.grosso.chat.constants.UserConstants;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.security.core.GrantedAuthority;
@@ -14,12 +17,17 @@ import java.util.List;
 
 @Entity
 @Getter @Setter
-@Table(name = "\"User\"")
-public class User implements UserDetails {
+ @AllArgsConstructor @NoArgsConstructor
+@Table(name = "users")
+@NamedQuery(name = UserConstants.FIND_USER_BY_EMAIL, query = "SELECT u FROM User u WHERE u.email =: email")
+@NamedQuery(name = UserConstants.FIND_USER_BY_ID, query = "SELECT u FROM User u WHERE u.id =: id")
+@NamedQuery(name = UserConstants.FIND_ALL_USERS_EXCEPT_SELF, query = "SELECT u FROM User WHERE u.id !=: id")
+public class User extends BaseAuditing implements UserDetails {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id_user")
-    private Long id;
+    private String id;
 
     @Basic
     @Column(nullable = false)
@@ -32,12 +40,14 @@ public class User implements UserDetails {
     private String lastName;
     private String password;
     private String email;
-
-    @Column(name = "created_at")
-    @CreatedDate
-    private LocalDateTime createdAt;
-
     private boolean enabled = false;
+    private LocalDateTime lastSeen;
+
+    @OneToMany(mappedBy = "sender")
+    private List<Chat> chatAsSender;
+
+    @OneToMany(mappedBy = "recipient")
+    private List<Chat>  chatAsRecipient;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "id_role")
@@ -72,5 +82,8 @@ public class User implements UserDetails {
         return UserDetails.super.isCredentialsNonExpired();
     }
 
-
+    @Transient
+    public boolean isUserOnline() {
+        return lastSeen != null && lastSeen.isAfter(LocalDateTime.now().minusMinutes(UserConstants.LAST_ACTIVATE_INTERNAL));
+    }
 }
